@@ -279,11 +279,8 @@ class make_predictions():
             for batch_valid in self.valid_loader:
                 data_batch = batch_valid.to(self.device)
                 x, y, a, batch = data_batch.x, data_batch.y, data_batch.edge_index, data_batch.batch
-                print("x,y,a", np.shape(x))
                 unnormalized_predictions = self.model(x, a, batch)        
-                print("unnormalized predictions")
-        unnormalized_predictions = unnormalized_predictions.cpu().numpy()            
-        print("to numpy")         
+        unnormalized_predictions = unnormalized_predictions.cpu().numpy()                    
         return(unnormalized_predictions)
     #
     def __call__(self):
@@ -303,14 +300,12 @@ class gridding_predictions():
         self.AMSR2_footprint_radius = AMSR2_footprint_radius 
         self.Surfex_coord = Surfex_coord
         self.list_targets = list_targets
-        self.idx_nan = np.logical_or(np.isnan(Graphs_coord["xx"]) == True, np.isnan(Graphs_coord["yy"]) == True)
-        self.idx_nan_extend = np.repeat(np.expand_dims(self.idx_nan, axis = 1), len(self.list_targets), axis = 1)
         self.Targets = Targets
         for var in self.Targets:
-            self.Targets[var] = self.Targets[var][self.idx_nan == False]
-        self.Graphs_xx = Graphs_coord["xx"][self.idx_nan == False]
-        self.Graphs_yy = Graphs_coord["yy"][self.idx_nan == False]
-        self.predictions = predictions[self.idx_nan_extend == False]
+            self.Targets[var] = self.Targets[var]
+        self.Graphs_xx = Graphs_coord["xx"]
+        self.Graphs_yy = Graphs_coord["yy"]
+        self.predictions = predictions
         self.paths = paths
     #
     def nearest_neighbor_indexes(self):
@@ -338,7 +333,7 @@ class gridding_predictions():
         #
         Gridded_predictions = {}
         for vi, var in enumerate(self.list_targets):
-            Pred_interp = np.ndarray.flatten(predictions[:, vi])[idx]
+            Pred_interp = np.ndarray.flatten(self.predictions[:, vi])[idx]
             Gridded_predictions[var] = np.reshape(Pred_interp, (len(self.Surfex_coord["y"]), len(self.Surfex_coord["x"])), order = "C")
             Gridded_predictions[var][Gridded_distance > self.AMSR2_footprint_radius] = np.nan
         #
@@ -430,7 +425,6 @@ for date_task in list_dates:
         GNN_model = GNN_GAT(**model_params).to(device)
         GNN_model.load_state_dict(checkpoint["model_state_dict"])
         #
-        print("Pred starts")
         t0 = time.time()
         predictions = make_predictions(list_targets = model_params["list_targets"], 
                                     model = GNN_model, 
@@ -439,7 +433,6 @@ for date_task in list_dates:
                                     normalization_stats = normalization_stats, 
                                     device = device)()
         #
-        print("Pred OK")
         t1 = time.time()
         print(date_task, t1 - t0)
         #
